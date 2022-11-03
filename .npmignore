@@ -1,0 +1,17 @@
+docs
+node_modules
+src
+.eslintignore
+.eslintrc.json
+.gitignore
+.npmignore
+.prettierrc.json
+.idea
+generate-doc.js
+jest.config.js
+jsdoc.config.json
+*.map
+*.txt
+*.md
+tsconfig.json
+webpack.config.js
