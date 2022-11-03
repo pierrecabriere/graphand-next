@@ -47,7 +47,7 @@ const defaultOpts: Partial<WithSSROpts> = {
     Object.keys(data).forEach((key) => {
       const value = data[key];
       if (typeof value?.serialize === "function") {
-        const Model = value.constructor;
+        const Model = value._model || value.constructor;
         const scope = Model.scope;
         if (!res.__modelsSerials[scope]) {
           res.__modelsSerials[scope] = Model.serializeModel().then((r: string) => (res.__modelsSerials[scope] = r));

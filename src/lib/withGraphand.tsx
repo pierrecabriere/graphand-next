@@ -16,7 +16,7 @@ function withGraphand(app: AppType, inputOpts: WithGraphandOpts) {
     if (!_initialized) {
       _initialized = true;
 
-      inputOpts?.server?.apply(undefined, [context]);
+      inputOpts?.server?.apply(inputOpts?.server, [context]);
     }
 
     return _getInitialProps.apply(app, [context]);
