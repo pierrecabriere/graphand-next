@@ -1,15 +1,17 @@
+import { deepEqual } from "fast-equals";
 import GraphandClient, { GraphandModel, GraphandModelList } from "graphand-js";
 import { GetServerSidePropsContext, NextPage } from "next";
-import { withRouter } from "next/router";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 type WithSSRData = {
   [key: string]: GraphandModel | GraphandModelList<GraphandModel> | any;
 };
 
+type ParsedContext = any;
+
 export type WithSSROpts = {
   client: GraphandClient;
-  getData?: (router: GetServerSidePropsContext) => WithSSRData | Promise<WithSSRData>;
+  getData?: (context: GetServerSidePropsContext | ParsedContext) => WithSSRData | Promise<WithSSRData>;
   encodeData?: (
     data: WithSSRData,
     client: GraphandClient,
@@ -30,6 +32,8 @@ export type WithSSROpts = {
       }
     | any;
   rebuildSSG?: (data: WithSSRData, client: GraphandClient) => any;
+  parseContextSSG?: (context: GetServerSidePropsContext) => ParsedContext;
+  fallback?: ReturnType<React.FunctionComponent>;
 };
 
 const defaultOpts: Partial<WithSSROpts> = {
@@ -86,72 +90,82 @@ const defaultOpts: Partial<WithSSROpts> = {
   rebuildSSG: (data: WithSSRData) => {
     return data;
   },
+  parseContextSSG: () => ({}),
 };
 
 function withSSR(
   inputPage: NextPage<any>,
   inputOpts: WithSSROpts,
-  fallback: ReturnType<React.Component["render"]> = "Chargement ...",
+  fallback: WithSSROpts["fallback"] = <>Chargement ...</>,
 ): { page: NextPage; getServerSideProps: any } {
   const opts = Object.assign({}, defaultOpts, inputOpts) as WithSSROpts;
 
-  let page, getServerSideProps;
-  page = class SSRComponent extends React.Component<any, any> {
-    state = {
-      ready: false,
-      injectProps: {},
-    };
+  fallback = inputOpts?.fallback ?? fallback;
 
-    constructor(props: any) {
-      super(props);
+  const page: NextPage<any> = ({ __ctx, ...props }) => {
+    const initializedRef = useRef<boolean>(false);
+    const readyRef = useRef<boolean>(false);
+    const injectedPropsRef = useRef<any>({});
+    const prevDataRef = useRef<any>(props.data);
+    const [reload, setReload] = useState(0);
 
-      this._build(props, false);
-    }
-
-    componentDidUpdate(prevProps: any, prevState: any) {
-      if (this.props.router.query !== prevProps.router.query) {
-        this._build(this.props);
-      }
-    }
-
-    async _build(props = this.props, runtime = true) {
+    const _build = async (reload = true) => {
       try {
-        let injectProps = {};
+        let newProps;
 
         if (process.env.NEXT_PUBLIC_SKIP_SSR) {
-          const data = await opts.getData(props.router as GetServerSidePropsContext);
-          injectProps = opts.rebuildSSG(data, opts.client);
+          const data = await opts.getData(__ctx);
+          newProps = opts.rebuildSSG(data, opts.client);
         } else {
           const data = JSON.parse(props.data);
-          injectProps = opts.rebuildSSR(data, opts.client);
+          newProps = opts.rebuildSSR(data, opts.client);
         }
 
-        if (!runtime && !process.env.SKIP_SSR) {
-          this.state.injectProps = injectProps;
-          this.state.ready = true;
-        } else {
-          this.setState({ injectProps, ready: true });
+        readyRef.current = true;
+        reload = reload && !deepEqual(newProps, injectedPropsRef.current);
+        injectedPropsRef.current = newProps;
+
+        if (reload) {
+          setReload((r) => r + 1);
         }
       } catch (e) {
         console.error(e);
       }
-    }
+    };
 
-    render() {
-      if (!this.state.ready) {
-        return fallback;
+    useEffect(() => {
+      if (__ctx) {
+        _build();
       }
+    }, [__ctx]);
 
-      const _props = {
-        ...this.props,
-        ...this.state.injectProps,
-      };
+    useEffect(() => {
+      if (!deepEqual(props.data, prevDataRef.current)) {
+        prevDataRef.current = props.data;
+        _build();
+      }
+    }, [props.data]);
 
-      return React.createElement(inputPage, _props);
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      _build(Boolean(process.env.NEXT_PUBLIC_SKIP_SSR));
     }
+
+    if (!readyRef.current) {
+      return fallback;
+    }
+
+    return (
+      <>
+        {React.createElement(inputPage, {
+          ...props,
+          ...injectedPropsRef.current,
+        })}
+      </>
+    );
   };
 
-  page = withRouter(page);
+  let getServerSideProps;
 
   if (!process.env.NEXT_PUBLIC_SKIP_SSR) {
     getServerSideProps = async function (ctx: GetServerSidePropsContext) {
@@ -167,6 +181,14 @@ function withSSR(
       return {
         props: {
           data: JSON.stringify(encodedData),
+        },
+      };
+    };
+  } else {
+    getServerSideProps = function (ctx: GetServerSidePropsContext) {
+      return {
+        props: {
+          __ctx: opts.parseContextSSG(ctx),
         },
       };
     };

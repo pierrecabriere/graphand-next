@@ -10,7 +10,7 @@ declare module "graphand-js" {
     withSSR: (
       inputPage: NextPage<any>,
       inputOpts: Omit<WithSSROpts, "client">,
-      fallback?: ReturnType<React.Component["render"]>,
+      fallback?: ReturnType<React.FunctionComponent>,
     ) => ReturnType<typeof withSSR>;
 
     withGraphand: (app: AppType, inputOpts: Omit<WithGraphandOpts, "client">) => ReturnType<typeof withGraphand>;
