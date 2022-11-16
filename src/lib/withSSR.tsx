@@ -90,7 +90,9 @@ const defaultOpts: Partial<WithSSROpts> = {
   rebuildSSG: (data: WithSSRData) => {
     return data;
   },
-  parseContextSSG: () => ({}),
+  parseContextSSG: () => {
+    return {};
+  },
 };
 
 function withSSR(
@@ -102,7 +104,7 @@ function withSSR(
 
   fallback = inputOpts?.fallback ?? fallback;
 
-  const page: NextPage<any> = ({ __ctx, ...props }) => {
+  const page: NextPage<any> = ({ __ctx, __data, ...props }) => {
     const initializedRef = useRef<boolean>(false);
     const readyRef = useRef<boolean>(false);
     const injectedPropsRef = useRef<any>({});
@@ -117,7 +119,7 @@ function withSSR(
           const data = await opts.getData(__ctx);
           newProps = opts.rebuildSSG(data, opts.client);
         } else {
-          const data = JSON.parse(props.data);
+          const data = JSON.parse(__data);
           newProps = opts.rebuildSSR(data, opts.client);
         }
 
@@ -180,7 +182,7 @@ function withSSR(
 
       return {
         props: {
-          data: JSON.stringify(encodedData),
+          __data: JSON.stringify(encodedData),
         },
       };
     };

@@ -1,4 +1,4 @@
-import { GraphandPlugin } from "graphand-js";
+import { GraphandClient, GraphandModel, GraphandPlugin } from "graphand-js";
 import { NextPage } from "next";
 import { AppType } from "next/app";
 import React from "react";
