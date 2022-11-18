@@ -103,15 +103,15 @@ function withSSR(
   const opts = Object.assign({}, defaultOpts, inputOpts) as WithSSROpts;
 
   fallback = inputOpts?.fallback ?? fallback;
-  const skipSSR = Boolean(process.env.SKIP_SSR);
 
   const page: NextPage<any> = ({ __ctx, __data, ...props }) => {
     const initializedRef = useRef<boolean>(false);
     const readyRef = useRef<boolean>(false);
     const injectedPropsRef = useRef<any>({});
     const prevDataRef = useRef<any>(__data);
-    const [reload, setReload] = useState(0);
-    const [loading, setLoading] = useState(false);
+    const [reload, setReload] = useState<number>(0);
+    const [loading, setLoading] = useState<boolean>(false);
+    const skipSSR = useRef<boolean>(Boolean(process.env.SKIP_SSR)).current;
 
     const _build = async (reload = true) => {
       try {
@@ -171,6 +171,8 @@ function withSSR(
   };
 
   const getServerSideProps = async function (ctx: GetServerSidePropsContext) {
+    const skipSSR = Boolean(process.env.SKIP_SSR);
+
     if (skipSSR) {
       return {
         props: {
