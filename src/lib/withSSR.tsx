@@ -11,6 +11,7 @@ type ParsedContext = any;
 
 export type WithSSROpts = {
   client: GraphandClient;
+  skipSSR?: boolean;
   getData?: (context: GetServerSidePropsContext | ParsedContext) => WithSSRData | Promise<WithSSRData>;
   encodeData?: (
     data: WithSSRData,
@@ -98,11 +99,12 @@ const defaultOpts: Partial<WithSSROpts> = {
 function withSSR(
   inputPage: NextPage<any>,
   inputOpts: WithSSROpts,
-  fallback: WithSSROpts["fallback"] = <>Loading ...</>,
+  inputFallback: WithSSROpts["fallback"] = <>Loading ...</>,
 ): { page: NextPage; getServerSideProps: any } {
   const opts = Object.assign({}, defaultOpts, inputOpts) as WithSSROpts;
 
-  fallback = inputOpts?.fallback ?? fallback;
+  const _skipSSR = () => inputOpts?.skipSSR ?? Boolean(process.env.SKIP_SSR);
+  const fallback = inputFallback ?? inputOpts?.fallback;
 
   const page: NextPage<any> = ({ __ctx, __data, ...props }) => {
     const initializedRef = useRef<boolean>(false);
@@ -111,33 +113,31 @@ function withSSR(
     const prevDataRef = useRef<any>(__data);
     const [reload, setReload] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(false);
-    const skipSSR = useRef<boolean>(Boolean(process.env.SKIP_SSR)).current;
 
     const _build = async (reload = true) => {
-      try {
-        let newProps = {};
+      let newProps = {};
 
-        if (__data) {
-          const data = JSON.parse(__data);
-          newProps = opts.rebuildSSR(data, opts.client);
-        } else if (skipSSR) {
-          setLoading(true);
-          try {
-            const data = await opts.getData(__ctx || {});
-            newProps = opts.rebuildSSG(data, opts.client);
-          } catch (e) {}
-          setLoading(false);
+      if (__data) {
+        const data = JSON.parse(__data);
+        newProps = opts.rebuildSSR(data, opts.client);
+      } else if (_skipSSR()) {
+        setLoading(true);
+        try {
+          const data = await opts.getData(__ctx || {});
+          newProps = opts.rebuildSSG(data, opts.client);
+        } catch (e) {
+          console.error(e);
+          console.error(`Failed to reload data on SSG build`);
         }
+        setLoading(false);
+      }
 
-        readyRef.current = true;
-        reload = reload && !deepEqual(newProps, injectedPropsRef.current);
-        injectedPropsRef.current = newProps;
+      readyRef.current = true;
+      reload = reload && !deepEqual(newProps, injectedPropsRef.current);
+      injectedPropsRef.current = newProps;
 
-        if (reload) {
-          setReload((r) => r + 1);
-        }
-      } catch (e) {
-        console.error(e);
+      if (reload) {
+        setReload((r) => r + 1);
       }
     };
 
@@ -155,8 +155,8 @@ function withSSR(
     }, [__data]);
 
     if (!initializedRef.current) {
+      _build(_skipSSR());
       initializedRef.current = true;
-      _build(skipSSR);
     }
 
     if (!readyRef.current) {
@@ -171,9 +171,7 @@ function withSSR(
   };
 
   const getServerSideProps = async function (ctx: GetServerSidePropsContext) {
-    const skipSSR = Boolean(process.env.SKIP_SSR);
-
-    if (skipSSR) {
+    if (_skipSSR()) {
       return {
         props: {
           __ctx: opts.parseContextSSG(ctx),
