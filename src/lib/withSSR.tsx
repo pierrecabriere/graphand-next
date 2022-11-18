@@ -104,7 +104,7 @@ function withSSR(
   const opts = Object.assign({}, defaultOpts, inputOpts) as WithSSROpts;
 
   const _skipSSR = () => inputOpts?.skipSSR ?? Boolean(process.env.SKIP_SSR);
-  const fallback = inputFallback ?? inputOpts?.fallback;
+  const _fallback = () => inputFallback ?? inputOpts?.fallback;
 
   const page: NextPage<any> = ({ __ctx, __data, ...props }) => {
     const initializedRef = useRef<boolean>(false);
@@ -160,7 +160,7 @@ function withSSR(
     }
 
     if (!readyRef.current) {
-      return fallback;
+      return _fallback();
     }
 
     return React.createElement(inputPage, {
