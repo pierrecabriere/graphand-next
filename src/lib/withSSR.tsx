@@ -99,12 +99,12 @@ const defaultOpts: Partial<WithSSROpts> = {
 function withSSR(
   inputPage: NextPage<any>,
   inputOpts: WithSSROpts,
-  inputFallback: WithSSROpts["fallback"] = <>Loading ...</>,
+  inputFallback?: WithSSROpts["fallback"],
 ): { page: NextPage; getServerSideProps: any } {
   const opts = Object.assign({}, defaultOpts, inputOpts) as WithSSROpts;
 
   const _skipSSR = () => inputOpts?.skipSSR ?? Boolean(process.env.SKIP_SSR);
-  const _fallback = () => inputFallback ?? inputOpts?.fallback;
+  const _fallback = () => inputFallback ?? inputOpts?.fallback ?? <>Loading ...</>;
 
   const page: NextPage<any> = ({ __ctx, __data, ...props }) => {
     const initializedRef = useRef<boolean>(false);
