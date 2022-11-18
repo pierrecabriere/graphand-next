@@ -13,7 +13,7 @@ function withGraphand(app: AppType, inputOpts: WithGraphandOpts) {
 
   const _getInitialProps = app.getInitialProps || App.getInitialProps;
   app.getInitialProps = async (context: AppContext) => {
-    if (!_initialized) {
+    if (!_initialized && typeof window === "undefined") {
       _initialized = true;
 
       inputOpts?.server?.apply(inputOpts?.server, [context]);

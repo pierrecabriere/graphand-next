@@ -33,7 +33,7 @@ export type WithSSROpts = {
     | any;
   rebuildSSG?: (data: WithSSRData, client: GraphandClient) => any;
   parseContextSSG?: (context: GetServerSidePropsContext) => ParsedContext;
-  fallback?: ReturnType<React.FunctionComponent>;
+  fallback?: React.ReactNode;
 };
 
 const defaultOpts: Partial<WithSSROpts> = {
@@ -98,7 +98,7 @@ const defaultOpts: Partial<WithSSROpts> = {
 function withSSR(
   inputPage: NextPage<any>,
   inputOpts: WithSSROpts,
-  fallback: WithSSROpts["fallback"] = <>Chargement ...</>,
+  fallback: WithSSROpts["fallback"] = <>Loading ...</>,
 ): { page: NextPage; getServerSideProps: any } {
   const opts = Object.assign({}, defaultOpts, inputOpts) as WithSSROpts;
 
@@ -113,12 +113,12 @@ function withSSR(
 
     const _build = async (reload = true) => {
       try {
-        let newProps;
+        let newProps = {};
 
-        if (process.env.NEXT_PUBLIC_SKIP_SSR) {
+        if (process.env.SKIP_SSR) {
           const data = await opts.getData(__ctx);
           newProps = opts.rebuildSSG(data, opts.client);
-        } else {
+        } else if (__data) {
           const data = JSON.parse(__data);
           newProps = opts.rebuildSSR(data, opts.client);
         }
@@ -150,26 +150,22 @@ function withSSR(
 
     if (!initializedRef.current) {
       initializedRef.current = true;
-      _build(Boolean(process.env.NEXT_PUBLIC_SKIP_SSR));
+      _build(Boolean(process.env.SKIP_SSR));
     }
 
     if (!readyRef.current) {
       return fallback;
     }
 
-    return (
-      <>
-        {React.createElement(inputPage, {
-          ...props,
-          ...injectedPropsRef.current,
-        })}
-      </>
-    );
+    return React.createElement(inputPage, {
+      ...props,
+      ...injectedPropsRef.current,
+    }) as any;
   };
 
   let getServerSideProps;
 
-  if (!process.env.NEXT_PUBLIC_SKIP_SSR) {
+  if (!process.env.SKIP_SSR) {
     getServerSideProps = async function (ctx: GetServerSidePropsContext) {
       const data = await opts.getData(ctx);
       if (!data) {
