@@ -103,24 +103,30 @@ function withSSR(
   const opts = Object.assign({}, defaultOpts, inputOpts) as WithSSROpts;
 
   fallback = inputOpts?.fallback ?? fallback;
+  const skipSSR = Boolean(process.env.SKIP_SSR);
 
   const page: NextPage<any> = ({ __ctx, __data, ...props }) => {
     const initializedRef = useRef<boolean>(false);
     const readyRef = useRef<boolean>(false);
     const injectedPropsRef = useRef<any>({});
-    const prevDataRef = useRef<any>(props.data);
+    const prevDataRef = useRef<any>(__data);
     const [reload, setReload] = useState(0);
+    const [loading, setLoading] = useState(false);
 
     const _build = async (reload = true) => {
       try {
         let newProps = {};
 
-        if (process.env.SKIP_SSR) {
-          const data = await opts.getData(__ctx);
-          newProps = opts.rebuildSSG(data, opts.client);
-        } else if (__data) {
+        if (__data) {
           const data = JSON.parse(__data);
           newProps = opts.rebuildSSR(data, opts.client);
+        } else if (skipSSR) {
+          setLoading(true);
+          try {
+            const data = await opts.getData(__ctx || {});
+            newProps = opts.rebuildSSG(data, opts.client);
+          } catch (e) {}
+          setLoading(false);
         }
 
         readyRef.current = true;
@@ -142,15 +148,15 @@ function withSSR(
     }, [__ctx]);
 
     useEffect(() => {
-      if (!deepEqual(props.data, prevDataRef.current)) {
-        prevDataRef.current = props.data;
+      if (!deepEqual(__data, prevDataRef.current)) {
+        prevDataRef.current = __data;
         _build();
       }
-    }, [props.data]);
+    }, [__data]);
 
     if (!initializedRef.current) {
       initializedRef.current = true;
-      _build(Boolean(process.env.SKIP_SSR));
+      _build(skipSSR);
     }
 
     if (!readyRef.current) {
@@ -160,37 +166,34 @@ function withSSR(
     return React.createElement(inputPage, {
       ...props,
       ...injectedPropsRef.current,
+      isSSGLoading: loading,
     }) as any;
   };
 
-  let getServerSideProps;
-
-  if (!process.env.SKIP_SSR) {
-    getServerSideProps = async function (ctx: GetServerSidePropsContext) {
-      const data = await opts.getData(ctx);
-      if (!data) {
-        return {
-          notFound: true,
-        };
-      }
-
-      const encodedData = (await opts.encodeData(data, opts.client)) || {};
-
-      return {
-        props: {
-          __data: JSON.stringify(encodedData),
-        },
-      };
-    };
-  } else {
-    getServerSideProps = function (ctx: GetServerSidePropsContext) {
+  const getServerSideProps = async function (ctx: GetServerSidePropsContext) {
+    if (skipSSR) {
       return {
         props: {
           __ctx: opts.parseContextSSG(ctx),
         },
       };
+    }
+
+    const data = await opts.getData(ctx);
+    if (!data) {
+      return {
+        notFound: true,
+      };
+    }
+
+    const encodedData = (await opts.encodeData(data, opts.client)) || {};
+
+    return {
+      props: {
+        __data: JSON.stringify(encodedData),
+      },
     };
-  }
+  };
 
   return { page, getServerSideProps };
 }
