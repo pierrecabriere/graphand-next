@@ -10,6 +10,8 @@ type WithSSRData = {
 type ParsedContext = any;
 
 export type WithSSROpts = {
+  cacheTTL?: number;
+  getCacheKey?: (context: GetServerSidePropsContext | ParsedContext) => string;
   client: GraphandClient;
   skipSSR?: boolean;
   getData?: (context: GetServerSidePropsContext | ParsedContext) => WithSSRData | Promise<WithSSRData>;
@@ -38,6 +40,8 @@ export type WithSSROpts = {
 };
 
 const defaultOpts: Partial<WithSSROpts> = {
+  cacheTTL: 0, // 0 = no cache
+  getCacheKey: () => "",
   getData: () => {
     return {};
   },
@@ -105,6 +109,7 @@ function withSSR(
 
   const _skipSSR = () => inputOpts?.skipSSR ?? Boolean(process.env.SKIP_SSR);
   const _fallback = () => inputFallback ?? inputOpts?.fallback ?? <>Loading ...</>;
+  const _cache = new Map<string, { data: string; timestamp: number }>();
 
   const page: NextPage<any> = ({ __ctx, __data, ...props }) => {
     const initializedRef = useRef<boolean>(false);
@@ -179,6 +184,20 @@ function withSSR(
       };
     }
 
+    const ttl = opts.cacheTTL;
+    const cacheKey = opts.getCacheKey?.(ctx) || "";
+    if (ttl !== undefined) {
+      const cache = _cache.get(cacheKey);
+      console.log(ttl, cache);
+      if (cache && Date.now() - cache.timestamp < ttl) {
+        return {
+          props: {
+            __data: cache.data,
+          },
+        };
+      }
+    }
+
     const data = await opts.getData(ctx);
     if (!data) {
       return {
@@ -187,10 +206,15 @@ function withSSR(
     }
 
     const encodedData = (await opts.encodeData(data, opts.client)) || {};
+    const __data = JSON.stringify(encodedData);
+
+    if (ttl !== undefined) {
+      _cache.set(cacheKey, { data: __data, timestamp: Date.now() });
+    }
 
     return {
       props: {
-        __data: JSON.stringify(encodedData),
+        __data,
       },
     };
   };

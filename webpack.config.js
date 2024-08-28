@@ -7,6 +7,7 @@ module.exports = {
   externals: {
     react: "react",
     "react-dom": "reactDOM",
+    "graphand-js": "graphand-js",
   },
   optimization: {
     minimize: true,
