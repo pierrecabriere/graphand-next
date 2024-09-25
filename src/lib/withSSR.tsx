@@ -185,10 +185,9 @@ function withSSR(
     }
 
     const ttl = opts.cacheTTL;
-    const cacheKey = opts.getCacheKey?.(ctx) || "";
-    if (ttl !== undefined) {
+    const cacheKey = opts.getCacheKey?.(ctx);
+    if (cacheKey && ttl !== undefined) {
       const cache = _cache.get(cacheKey);
-      console.log(ttl, cache);
       if (cache && Date.now() - cache.timestamp < ttl) {
         return {
           props: {
@@ -208,7 +207,7 @@ function withSSR(
     const encodedData = (await opts.encodeData(data, opts.client)) || {};
     const __data = JSON.stringify(encodedData);
 
-    if (ttl !== undefined) {
+    if (cacheKey && ttl !== undefined) {
       _cache.set(cacheKey, { data: __data, timestamp: Date.now() });
     }
 

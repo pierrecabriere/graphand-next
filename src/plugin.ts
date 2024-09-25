@@ -6,7 +6,7 @@ import withGraphand, { WithGraphandOpts } from "./lib/withGraphand";
 import withSSR, { WithSSROpts } from "./lib/withSSR";
 
 declare module "graphand-js" {
-  class GraphandClient {
+  export interface GraphandClient {
     withSSR: (
       inputPage: NextPage<any>,
       inputOpts: Omit<WithSSROpts, "client">,
